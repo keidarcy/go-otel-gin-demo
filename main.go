@@ -40,21 +40,9 @@ var (
 	)
 )
 
-func main() {
-	// Add metrics endpoint
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":2222", nil)
-	}()
-
-	logrus.SetFormatter(&logrus.JSONFormatter{})
-	logrus.SetLevel(logrus.InfoLevel)
-
-	shutdown := initTracer()
-	defer shutdown()
-
+// setupRouter initializes and returns a Gin router with all routes configured
+func setupRouter() *gin.Engine {
 	r := gin.Default()
-
 	r.Use(otelgin.Middleware("hello-service"))
 
 	r.GET("/hello", func(c *gin.Context) {
@@ -82,6 +70,24 @@ func main() {
 		requestDuration.WithLabelValues(c.Request.Method, c.Request.URL.Path, status).
 			Observe(time.Since(start).Seconds())
 	})
+
+	return r
+}
+
+func main() {
+	// Add metrics endpoint
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":2222", nil)
+	}()
+
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetLevel(logrus.InfoLevel)
+
+	shutdown := initTracer()
+	defer shutdown()
+
+	r := setupRouter()
 
 	log.Println("Listening on http://localhost:8080")
 	r.Run(":8080")
